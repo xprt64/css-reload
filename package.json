@@ -1,0 +1,12 @@
+{
+  "name": "xprt64cssreload",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "chokidar" : "^2.0.4",
+    "express": "^4.16.3"
+   }
+}
