@@ -2,30 +2,61 @@
  * Copyright (c) 2018. Constantin Galbenu <xprt64@gmail.com> Toate drepturile rezervate. All rights reserved.
  */
 
-var http = require("http");
 var url = require('url');
-var express = require('express');
 var chokidar = require('chokidar');
 var fs = require('fs');
 
 var clients = {};
 var clientsLength = 0;
 var i = 0;	//debug variable
-var listenersManager;
 
-var SSE_PORT = 6971;
-var HTTP_PORT = 8080;
+var SSE_PORT = process.env.SSE_PORT;
+var SSE_PORT_SECURE = process.env.SSE_PORT_SECURE;
+var HTTP_PORT = process.env.HTTP_PORT;
+var HTTPS_PORT = process.env.HTTPS_PORT;
 
-const clientJs = fs.readFileSync('client.js');
+const clientJs = fs.readFileSync('client.js').toString()
+    .replace(/__HOST__/g, process.env.SSE_HOST)
+    .replace(/__PORT__/g, process.env.SSE_PORT)
+    .replace(/__SECURE_PORT__/g, process.env.SSE_PORT_SECURE)
+;
 
-http.createServer(function (request, response) {
+const useHttps = fs.existsSync('/run/secrets/site.key') && fs.existsSync('/run/secrets/site.crt');
+
+console.log('useHttps', useHttps);
+
+
+
+const options = useHttps ? {
+    key: fs.readFileSync('/run/secrets/site.key'),
+    cert: fs.readFileSync('/run/secrets/site.crt')
+} : {};
+
+
+require("http")
+    .createServer(serverFunction)
+    .listen(HTTP_PORT, '0.0.0.0')
+    .on("listening", () => console.log(`HTTP listening on ${SSE_PORT}`) );
+
+
+if (useHttps) {
+    require("https")
+        .createServer(options, serverFunction)
+        .listen(HTTPS_PORT, '0.0.0.0')
+        .on("listening", () => console.log(`HTTPS listening on ${HTTPS_PORT}`));
+
+}
+
+var http = useHttps ? require("https") : require("http");
+
+function serverFunction(request, response) {
     response.writeHead(200, {
         'Content-Type': 'text/javascript',
         'Content-Length': clientJs.length,
         'Cache-Control': 'public; max-age=31536000'
     });
     response.end(clientJs, 'utf-8');
-}).listen(HTTP_PORT);
+}
 
 // One-liner for current directory, ignores .dotfiles
 chokidar.watch('/watch', {ignored: /(^|[\/\\])\../}).on('all', (event, path) => {
@@ -48,11 +79,21 @@ function broadcast(eventType, filename) {
  */
 setInterval(sendKeepAlive, 10 * 1000);
 
-/**************************
- * The event listeners manager
- */
 
-listenersManager = http.createServer(function (req, response) {
+require("http")
+    .createServer(sseServerFunction)
+    .listen(SSE_PORT, '0.0.0.0')
+    .on("listening", () => console.log(`HTTP listening on ${SSE_PORT}`) );
+
+if (useHttps) {
+    require("https")
+        .createServer(options, sseServerFunction)
+        .listen(SSE_PORT_SECURE, '0.0.0.0')
+        .on("listening", () => console.log(`HTTPS listening on ${SSE_PORT_SECURE}`));
+
+}
+
+function sseServerFunction(req, response) {
     try {
         var sock = req.connection;
         var client_id = sock.remoteAddress + ':' + sock.remotePort + '#' + Math.random();
@@ -83,8 +124,7 @@ listenersManager = http.createServer(function (req, response) {
             console.log("error event:" + client_id);
             removeClient(client_id);
         });
-    }
-    catch (e) {
+    } catch (e) {
         response.writeHead(400, {
             'Content-Type': 'text/event-stream',
             'Access-Control-Allow-Origin': '*',
@@ -94,9 +134,11 @@ listenersManager = http.createServer(function (req, response) {
         response.write(`${e}`);
         response.end();
     }
-});
+};
+/**************************
+ * The event listeners manager
+ */
 
-listenersManager.listen(SSE_PORT, '0.0.0.0');
 
 function removeClient(clientId) {
 

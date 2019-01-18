@@ -13,4 +13,9 @@ COPY . /usr/src/app
 
 EXPOSE 6970
 EXPOSE 6969
+
+ENV SSE_PORT=6971
+ENV HTTP_PORT=8080
+ENV SSE_HOST=10.6.0.102
+
 CMD [ "npm", "start" ]
