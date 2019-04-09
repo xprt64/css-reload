@@ -169,7 +169,7 @@ function sendKeepAlive() {
 
         client.response.write(": keep alive\n");
 
-        console.log("pinged client #" + j);
+        //console.log("pinged client #" + j);
     }
 }
 
